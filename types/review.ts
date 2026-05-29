@@ -1,3 +1,10 @@
+export interface ReviewContext {
+  icp: string;
+  product: string;
+  targetMarket: string;
+  adPlatform: string;
+}
+
 export interface DimensionScore {
   score: number;
   feedback: string;

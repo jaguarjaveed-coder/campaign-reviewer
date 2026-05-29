@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ReviewResult, DimensionScore } from "@/types/review";
+import type { ReviewResult, DimensionScore, ReviewContext } from "@/types/review";
 
 const PLACEHOLDER = `Example — paste your ad or landing page copy here:
 
@@ -14,6 +14,9 @@ so your team can act fast, not just report fast.
 ✓ GDPR-compliant data processing
 
 Start your free 14-day trial. No credit card required.`;
+
+const TARGET_MARKETS = ["DACH", "Benelux", "Nordics", "UK", "France", "Wider EU", "US"];
+const AD_PLATFORMS = ["Google Ads", "Meta Ads", "LinkedIn Ads", "Landing Page"];
 
 const DIMENSIONS: {
   key: keyof Omit<ReviewResult, "totalScore" | "rewrittenCopy">;
@@ -74,11 +77,25 @@ function DimensionCard({ dim, data }: { dim: typeof DIMENSIONS[0]; data: Dimensi
   );
 }
 
+// Shared styles for text inputs and selects so they stay visually consistent
+const inputClass =
+  "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100 transition";
+
 export default function Home() {
   const [copy, setCopy] = useState("");
+  const [context, setContext] = useState<ReviewContext>({
+    icp: "",
+    product: "",
+    targetMarket: "",
+    adPlatform: "",
+  });
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function setCtx(field: keyof ReviewContext, value: string) {
+    setContext((prev) => ({ ...prev, [field]: value }));
+  }
 
   async function handleReview() {
     if (!copy.trim()) return;
@@ -90,7 +107,9 @@ export default function Home() {
       const res = await fetch("/api/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ copy }),
+        // context is sent alongside copy so the API can ground each scoring
+        // dimension against the user's actual strategy
+        body: JSON.stringify({ copy, context }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unknown error");
@@ -116,38 +135,123 @@ export default function Home() {
 
       <main className="mx-auto max-w-6xl px-6 py-10 space-y-10">
         {/* Input section */}
-        <section className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
-          <label htmlFor="copy-input" className="block text-sm font-semibold text-gray-700 mb-2">
-            Paste your ad copy or landing page copy
-          </label>
-          <textarea
-            id="copy-input"
-            value={copy}
-            onChange={(e) => setCopy(e.target.value)}
-            placeholder={PLACEHOLDER}
-            rows={10}
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 placeholder-gray-400 focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100 resize-y transition"
-          />
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs text-gray-400">{copy.length.toLocaleString()} / 10 000 characters</span>
-            <button
-              onClick={handleReview}
-              disabled={loading || !copy.trim() || copy.length > 10_000}
-              className="rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Reviewing…
-                </span>
-              ) : (
-                "Review Copy"
-              )}
-            </button>
+        <section className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 space-y-5">
+
+          {/* Context inputs — ground each scoring dimension in the user's strategy */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-3">
+              Campaign context{" "}
+              <span className="font-normal text-gray-400">(optional — improves scoring accuracy)</span>
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+
+              {/* ICP / persona — used to ground icpFit scoring */}
+              <div>
+                <label htmlFor="ctx-icp" className="block text-xs font-medium text-gray-600 mb-1">
+                  Target ICP / persona
+                </label>
+                <input
+                  id="ctx-icp"
+                  type="text"
+                  value={context.icp}
+                  onChange={(e) => setCtx("icp", e.target.value)}
+                  placeholder="e.g. VP Marketing at Series B SaaS, 50–200 employees"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Product / category — used to ground valueProp scoring */}
+              <div>
+                <label htmlFor="ctx-product" className="block text-xs font-medium text-gray-600 mb-1">
+                  Product / category
+                </label>
+                <input
+                  id="ctx-product"
+                  type="text"
+                  value={context.product}
+                  onChange={(e) => setCtx("product", e.target.value)}
+                  placeholder="e.g. B2B analytics platform, marketing automation tool"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Target market — used to ground euLocalization scoring */}
+              <div>
+                <label htmlFor="ctx-market" className="block text-xs font-medium text-gray-600 mb-1">
+                  Target market
+                </label>
+                <select
+                  id="ctx-market"
+                  value={context.targetMarket}
+                  onChange={(e) => setCtx("targetMarket", e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select a market</option>
+                  {TARGET_MARKETS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ad platform — used to ground ctaStrength scoring */}
+              <div>
+                <label htmlFor="ctx-platform" className="block text-xs font-medium text-gray-600 mb-1">
+                  Ad platform
+                </label>
+                <select
+                  id="ctx-platform"
+                  value={context.adPlatform}
+                  onChange={(e) => setCtx("adPlatform", e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select a platform</option>
+                  {AD_PLATFORMS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+            </div>
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-100" />
+
+          {/* Copy textarea */}
+          <div>
+            <label htmlFor="copy-input" className="block text-sm font-semibold text-gray-700 mb-2">
+              Paste your ad copy or landing page copy
+            </label>
+            <textarea
+              id="copy-input"
+              value={copy}
+              onChange={(e) => setCopy(e.target.value)}
+              placeholder={PLACEHOLDER}
+              rows={10}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 placeholder-gray-400 focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100 resize-y transition"
+            />
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-gray-400">{copy.length.toLocaleString()} / 10 000 characters</span>
+              <button
+                onClick={handleReview}
+                disabled={loading || !copy.trim() || copy.length > 10_000}
+                className="rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Reviewing…
+                  </span>
+                ) : (
+                  "Review Copy"
+                )}
+              </button>
+            </div>
+          </div>
+
         </section>
 
         {/* Error */}
