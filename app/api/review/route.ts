@@ -6,7 +6,7 @@ const client = new Anthropic();
 
 const SYSTEM_PROMPT = `You are a senior B2B marketing strategist with deep expertise in conversion copywriting, ICP targeting, and EU market compliance. Review the submitted ad or landing page copy and score it across four dimensions.
 
-IMPORTANT: Respond with valid JSON only — no prose, no markdown code fences, no extra text.
+Respond with ONLY a raw JSON object. No markdown, no code fences, no explanation. Start with { and end with }.
 
 Scoring dimensions (each 0–25 points):
 
@@ -85,7 +85,8 @@ export async function POST(req: NextRequest) {
       throw new Error("Unexpected response type from model.");
     }
 
-    const result: ReviewResult = JSON.parse(raw.text);
+    const cleaned = raw.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const result: ReviewResult = JSON.parse(cleaned);
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof SyntaxError) {

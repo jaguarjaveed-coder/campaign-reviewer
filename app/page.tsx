@@ -111,9 +111,6 @@ export default function Home() {
             <h1 className="text-xl font-bold text-gray-900">Campaign Copy Reviewer</h1>
             <p className="text-sm text-gray-500 mt-0.5">Score your marketing copy across 4 dimensions</p>
           </div>
-          <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700">
-            Powered by Claude
-          </span>
         </div>
       </header>
 
