@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import type { ReviewResult, DimensionScore, ReviewContext } from "@/types/review";
+
+// Loaded client-side only — recharts accesses window/document during render
+// and would throw on the server. The fallback keeps layout stable while it mounts.
+const ScoreRadar = dynamic(() => import("@/app/components/ScoreRadar"), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 h-[376px] animate-pulse" />
+  ),
+});
 
 const PLACEHOLDER = `Example — paste your ad or landing page copy here:
 
@@ -288,6 +298,9 @@ export default function Home() {
                 </p>
               </div>
             </div>
+
+            {/* Radar chart — four-axis spider view of the dimension scores */}
+            <ScoreRadar result={result} />
 
             {/* Dimension cards */}
             <div>
